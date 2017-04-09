@@ -19,6 +19,13 @@
 #                     'status': ['stableinterface'],
 #                     'supported_by': 'curated'}
 
+import requests
+import time
+from ast import literal_eval
+from urlparse import urlparse, parse_qs
+
+from ansible.module_utils.basic import AnsibleModule
+
 DOCUMENTATION = """
 ---
 author: "Romain Acciari"
@@ -32,16 +39,6 @@ options:
         description:
         - URI of the InfluxDB database.
         required: true
-    database:
-        description:
-        - Database to use.
-        default: graphite
-        required: true
-    precision:
-        description:
-        - The precision to store data
-        default: events
-        required: false
     measurement:
         description:
         - Measurement to store data.
@@ -69,7 +66,7 @@ EXAMPLES = """
 - hosts: localhost
   tasks:
     - influxdb:
-        uri: http://127.0.0.1:8086/write
+        uri: http://127.0.0.1:8086/write?u=root&p=root
         tags:
           host: myhostname
         value: Ansible test
@@ -80,8 +77,7 @@ EXAMPLES = """
 - hosts: ansible_group
   tasks:
     - influxdb:
-        uri: http://127.0.0.1:8086/write
-        database: graphite
+        uri: http://127.0.0.1:8086/write?u=root&p=root&db=graphite&precision=s
         measurement: events
         tags:
           host: "{{ inventory_hostname }}"
@@ -89,20 +85,12 @@ EXAMPLES = """
       delegate_to: localhost
 """
 
-import requests
-import time
-from ast import literal_eval
-
-from ansible.module_utils.basic import AnsibleModule
-
 
 def main():
 
     module = AnsibleModule(
         argument_spec=dict(
             uri=dict(default=None),
-            database=dict(default='graphite'),
-            precision=dict(default='s'),
             measurement=dict(default='events'),
             tags=dict(default=None),
             value=dict(default=None),
@@ -111,8 +99,6 @@ def main():
     )
 
     uri = module.params.get('uri')
-    database = module.params.get('database')
-    precision = module.params.get('precision')
     measurement = module.params.get('measurement')
     tags = module.params.get('tags')
     value = module.params.get('value')
@@ -120,7 +106,9 @@ def main():
 
     # Prepare headers and parameters for Request
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-    params = {'db': database, 'precision': precision}
+    parsed = urlparse(uri)
+    params = parse_qs(parsed.query)
+    influx_uri = parsed.scheme + "://" + parsed.netloc + parsed.path
 
     # Start building message
     data = '%s,' % measurement
@@ -133,16 +121,17 @@ def main():
 
     # Write data to InfluxDB using Request
     try:
-        r = requests.Request('POST', uri, headers=headers,
+        r = requests.Request('POST', influx_uri, headers=headers,
                              data=data, params=params)
         prepared = r.prepare()
         s = requests.Session()
         s.send(prepared)
     except Exception, e:
         module.fail_json(rc=1, msg='Failed to send data to InfluxDB %s: %s'
-                         % (uri, e))
+                         % (influx_uri, e))
 
     module.exit_json(changed=True, data=data)
 
 
 main()
+
