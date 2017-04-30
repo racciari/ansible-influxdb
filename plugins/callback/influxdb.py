@@ -22,7 +22,6 @@ from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
 import os
-import json
 import requests
 import time
 from urlparse import urlparse, parse_qs
@@ -44,6 +43,14 @@ class CallbackModule(CallbackBase):
         self.disabled = False
 
         super(CallbackModule, self).__init__()
+
+        callback_status = os.getenv('ANSIBLE_CALLBACK_INFLUXDB',
+                                    'enabled').lower()
+        disabling = ['disable', 'disabled', 'false', 'no']
+        if callback_status in disabling:
+            self._display.warning('Ansible callback InfluxDB disabled by'
+                                  ' environment variable.')
+            self.disabled = True
 
         self.uri = os.getenv('INFLUXDB_URI')
         self.measurement = os.getenv('INFLUXDB_MEASUREMENT', 'events')
