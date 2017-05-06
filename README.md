@@ -27,10 +27,12 @@ You can add any tag you want to the `tags` parameter.
 
 ## InfluxDB callback
 
-To use the callback, you need to enable it in your `/etc/ansible/ansible.cfg`:
+To use the callback, you need to enable it in your `/etc/ansible/ansible.cfg`. In the `[defaults]` section, you must configure the following:
 
 ```
 callback_whitelist = influxdb
+bin_ansible_callbacks = True
+callback_plugins = /path/to/callback/
 ```
 
 For the callback to work, you need to export at least the following environment variable:
